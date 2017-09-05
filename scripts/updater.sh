@@ -1,10 +1,11 @@
 #!/bin/sh
 
 # Variables
-OWNER=ctco
+OWNER=IgorGursky
 REPO=zephyr-sync
 TMPDIR=/tmp/$OWNER-$REPO
 FORK_TO=sergeytrasko
+GIT_PASSWORD=$(<../.env)
 
 # Functions
 function cleanup {
@@ -13,16 +14,16 @@ function cleanup {
 }
 
 function cloneRepo {
-    echo Cloning repository...
+    echo Cloning repository to $TMPDIR/$2...
     mkdir $TMPDIR
     cd $TMPDIR
-    git clone https://github.com/$OWNER/$REPO.git
+    git clone https://github.com/$1/$2.git $1-$2
 
-    cd $REPO
+    cd $1-$2
 }
 
 function tryUpdateVersions {
-    echo Check that build is passing
+    echo Check that build is passing...
     mvn clean test
     if [ $? -ne 0 ]
     then
@@ -50,8 +51,8 @@ function tryUpdateVersions {
 
 function forkRepository {
     echo Forking original repository...
-    # TODO implement properly - need to enter password
-    curl -u $FORK_TO -d '' https://api.github.com/repos/$OWNER/$REPO/forks
+    curl -u $FORK_TO:$GIT_PASSWORD -d '' https://api.github.com/repos/$OWNER/$REPO/forks
+    cloneRepo $FORK_TO $REPO
 }
 
 function updateVersions {
@@ -61,19 +62,19 @@ function updateVersions {
 
 function commitChanges {
     echo Committing changes...
-    # TODO implement
+    git commit -am "Versions update"
+    git push
 }
 
 function createPullRequest {
     echo Creating pull request...
-    # TODO implement
-
+    curl -u $FORK_TO:$GIT_PASSWORD -d '{"title": "Version update", "head": "'$FORK_TO':master", "base": "master"}' https://api.github.com/repos/$OWNER/$REPO/pulls
 }
 
 # Main routine
 pushd $(pwd)
 
-cloneRepo
+cloneRepo $OWNER $REPO
 if tryUpdateVersions; then
     echo Has version changes and tests have passed
     forkRepository
